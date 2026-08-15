@@ -1,0 +1,60 @@
+syntax = "proto3";
+
+package customer.v1;
+
+option java_package = "com.sonnesen.customer.grpc";
+option java_multiple_files = true;
+
+message Customer {
+    int64 id = 1;
+    string name = 2;
+    string email = 3;
+    string phone = 4;
+    Address address = 5;
+    CustomerStatus status = 6;
+}
+
+message Address {
+    string street = 1;
+    string city = 2;
+    string state = 3;
+    string zip_code = 4;
+}
+
+enum CustomerStatus {
+    CUSTOMER_STATUS_UNSPECIFIED = 0;
+    CUSTOMER_STATUS_ACTIVE = 1;
+    CUSTOMER_STATUS_INACTIVE = 2;
+}
+
+message GetCustomerRequest {
+    int64 id = 1;
+}
+
+message CreateCustomerRequest {
+    string name = 1;
+    string email = 2;
+    string phone = 3;
+    Address address = 4;
+}
+
+message ListCustomersRequest {
+}
+
+message ListCustomersResponse {
+    repeated Customer customers = 1;
+}
+
+
+service CustomerService {
+    rpc GetCustomer(GetCustomerRequest) returns (Customer);
+
+    rpc CreateCustomer(CreateCustomerRequest) returns (Customer);
+
+    rpc ListCustomers(ListCustomersRequest) returns (ListCustomersResponse);
+}
+
+
+
+
+
