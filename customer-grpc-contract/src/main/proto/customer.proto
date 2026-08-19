@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package customer.v1;
 
+import "google/protobuf/empty.proto";
+
 option java_package = "com.sonnesen.customer.grpc";
 option java_multiple_files = true;
 
@@ -38,11 +40,29 @@ message CreateCustomerRequest {
     Address address = 4;
 }
 
+message UpdateCustomerRequest {
+    int64 id = 1;
+    string name = 2;
+    string email = 3;
+    string phone = 4;
+    Address address = 5;
+}
+
+message DeleteCustomerRequest {
+    int64 id = 1;
+}
+
 message ListCustomersRequest {
+    // Max customers to return; server clamps to a reasonable default/max if unset or too large.
+    int32 page_size = 1;
+    // Opaque token from a previous ListCustomersResponse.next_page_token; empty for the first page.
+    string page_token = 2;
 }
 
 message ListCustomersResponse {
     repeated Customer customers = 1;
+    // Empty when there are no more pages.
+    string next_page_token = 2;
 }
 
 
@@ -50,6 +70,10 @@ service CustomerService {
     rpc GetCustomer(GetCustomerRequest) returns (Customer);
 
     rpc CreateCustomer(CreateCustomerRequest) returns (Customer);
+
+    rpc UpdateCustomer(UpdateCustomerRequest) returns (Customer);
+
+    rpc DeleteCustomer(DeleteCustomerRequest) returns (google.protobuf.Empty);
 
     rpc ListCustomers(ListCustomersRequest) returns (ListCustomersResponse);
 }

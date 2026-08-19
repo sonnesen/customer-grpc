@@ -60,6 +60,51 @@ public class JdbiCustomerRepository implements CustomerRepository {
             .list());
     }
 
+    @Override
+    public Optional<Customer> update(long id, String name, String email, String phone, Address address) {
+        try {
+            return jdbi.withHandle(handle -> handle.createQuery("""
+                    UPDATE customers
+                    SET name = :name, email = :email, phone = :phone,
+                        street = :street, city = :city, state = :state, zip_code = :zipCode
+                    WHERE id = :id
+                    RETURNING *
+                    """)
+                .bind("id", id)
+                .bind("name", name)
+                .bind("email", email)
+                .bind("phone", phone)
+                .bind("street", address.street())
+                .bind("city", address.city())
+                .bind("state", address.state())
+                .bind("zipCode", address.zipCode())
+                .map(new CustomerRowMapper())
+                .findOne());
+        } catch (RuntimeException e) {
+            if (isUniqueViolation(e)) {
+                throw new DuplicateEmailException(email);
+            }
+            throw e;
+        }
+    }
+
+    @Override
+    public boolean deleteById(long id) {
+        return jdbi.withHandle(handle -> handle.createUpdate("DELETE FROM customers WHERE id = :id")
+            .bind("id", id)
+            .execute()) > 0;
+    }
+
+    @Override
+    public List<Customer> findPage(long afterId, int limit) {
+        return jdbi.withHandle(handle -> handle.createQuery(
+                "SELECT * FROM customers WHERE id > :afterId ORDER BY id LIMIT :limit")
+            .bind("afterId", afterId)
+            .bind("limit", limit)
+            .map(new CustomerRowMapper())
+            .list());
+    }
+
     private static boolean isUniqueViolation(Throwable e) {
         for (Throwable cause = e; cause != null; cause = cause.getCause()) {
             if (cause instanceof PSQLException psqlException

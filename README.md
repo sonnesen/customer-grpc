@@ -6,7 +6,8 @@ persistência com JDBI + PostgreSQL e migrations com Flyway.
 ## Módulos
 
 - **customer-grpc-contract**: `customer.proto` (mensagens `Customer`/`Address`/`CustomerStatus`
-  e o serviço `CustomerService`) e a geração dos stubs Java via `protobuf-maven-plugin`.
+  e o serviço `CustomerService`, com CRUD completo e paginação em `ListCustomers`) e a geração
+  dos stubs Java via `protobuf-maven-plugin`.
 - **customer-grpc-server**: implementação do `CustomerService`, persistindo em PostgreSQL via JDBI.
 - **customer-grpc-client**: cliente de linha de comando que demonstra as chamadas ao server.
 
@@ -53,8 +54,9 @@ o gRPC server na porta `50052` (configurável via `-Dserver.port`).
 mvn -pl customer-grpc-client exec:java -Dexec.mainClass=com.sonnesen.Main
 ```
 
-A demo cria um cliente, busca ele de volta por id e lista todos os clientes,
-imprimindo os resultados no console.
+A demo exercita o CRUD completo: cria um cliente, busca ele de volta por id, atualiza
+nome/e-mail/telefone, lista os clientes paginando uma página por vez (`page_size=1`),
+deleta o cliente criado e confirma que o `getCustomer` seguinte falha com `NOT_FOUND`.
 
 ### 5. Testes
 
@@ -87,8 +89,15 @@ manualmente; o `ExceptionHandlingInterceptor` centraliza a tradução para
 `NOT_FOUND`/`ALREADY_EXISTS`/`INVALID_ARGUMENT`/`INTERNAL`, logando o stack trace
 completo só no servidor (sem vazar detalhes internos pro cliente).
 
+## Paginação em ListCustomers
+
+`ListCustomersRequest` aceita `page_size` (default 20, máximo 100) e `page_token`
+(vazio para a primeira página). `ListCustomersResponse.next_page_token` vem vazio
+quando não há mais páginas. O token é opaco pro cliente — internamente é só o id
+do último cliente da página anterior, codificado em base64 (veja `PageToken`).
+
 ## Roadmap
 
-O plano de evolução completo (fases de qualidade/infra e novas funcionalidades:
-CRUD completo com paginação, streaming, segurança/observabilidade) está descrito
-à parte no planejamento do projeto.
+Próximos passos possíveis: RPCs de streaming (server/client/bidirecional), TLS,
+autenticação via metadata, observabilidade (métricas/tracing) — descritos à parte
+no planejamento do projeto.

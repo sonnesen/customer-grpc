@@ -1,7 +1,9 @@
 package com.sonnesen;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
@@ -22,8 +24,11 @@ import com.sonnesen.customer.grpc.CreateCustomerRequest;
 import com.sonnesen.customer.grpc.Customer;
 import com.sonnesen.customer.grpc.CustomerServiceGrpc;
 import com.sonnesen.customer.grpc.CustomerServiceGrpc.CustomerServiceBlockingStub;
+import com.sonnesen.customer.grpc.DeleteCustomerRequest;
 import com.sonnesen.customer.grpc.GetCustomerRequest;
 import com.sonnesen.customer.grpc.ListCustomersRequest;
+import com.sonnesen.customer.grpc.ListCustomersResponse;
+import com.sonnesen.customer.grpc.UpdateCustomerRequest;
 
 import io.grpc.Server;
 import io.grpc.StatusRuntimeException;
@@ -119,9 +124,10 @@ class CustomerServiceImplTest {
     @Test
     void createWithDuplicateEmailFailsWithAlreadyExists() {
         client.createCustomer(createRequest("dup@example.com"));
+        CreateCustomerRequest secondWithSameEmail = createRequest("dup@example.com");
 
         StatusRuntimeException e = assertThrows(StatusRuntimeException.class,
-            () -> client.createCustomer(createRequest("dup@example.com")));
+            () -> client.createCustomer(secondWithSameEmail));
         assertEquals(io.grpc.Status.Code.ALREADY_EXISTS, e.getStatus().getCode());
     }
 
@@ -140,5 +146,71 @@ class CustomerServiceImplTest {
         var response = client.listCustomers(ListCustomersRequest.newBuilder().build());
 
         assertEquals(2, response.getCustomersCount());
+    }
+
+    @Test
+    void listCustomersPaginatesWithPageSizeAndToken() {
+        client.createCustomer(createRequest("a@example.com"));
+        client.createCustomer(createRequest("b@example.com"));
+        client.createCustomer(createRequest("c@example.com"));
+
+        ListCustomersResponse firstPage = client.listCustomers(
+            ListCustomersRequest.newBuilder().setPageSize(2).build());
+        assertEquals(2, firstPage.getCustomersCount());
+        assertFalse(firstPage.getNextPageToken().isEmpty());
+
+        ListCustomersResponse secondPage = client.listCustomers(
+            ListCustomersRequest.newBuilder().setPageSize(2).setPageToken(firstPage.getNextPageToken()).build());
+        assertEquals(1, secondPage.getCustomersCount());
+        assertTrue(secondPage.getNextPageToken().isEmpty());
+    }
+
+    @Test
+    void updateCustomerChangesFieldsAndKeepsId() {
+        Customer created = client.createCustomer(createRequest("before@example.com"));
+        UpdateCustomerRequest request = UpdateCustomerRequest.newBuilder()
+            .setId(created.getId())
+            .setName("Ada Byron")
+            .setEmail("after@example.com")
+            .setPhone("+55 51 90000-9999")
+            .setAddress(SOME_ADDRESS)
+            .build();
+
+        Customer updated = client.updateCustomer(request);
+
+        assertEquals(created.getId(), updated.getId());
+        assertEquals("Ada Byron", updated.getName());
+        assertEquals("after@example.com", updated.getEmail());
+    }
+
+    @Test
+    void updateUnknownCustomerFailsWithNotFound() {
+        UpdateCustomerRequest request = UpdateCustomerRequest.newBuilder()
+            .setId(-1)
+            .setName("Ada Byron")
+            .setEmail("ghost@example.com")
+            .setPhone("+55 51 90000-9999")
+            .setAddress(SOME_ADDRESS)
+            .build();
+
+        StatusRuntimeException e = assertThrows(StatusRuntimeException.class, () -> client.updateCustomer(request));
+        assertEquals(io.grpc.Status.Code.NOT_FOUND, e.getStatus().getCode());
+    }
+
+    @Test
+    void deleteCustomerThenGetFailsWithNotFound() {
+        Customer created = client.createCustomer(createRequest("todelete@example.com"));
+
+        client.deleteCustomer(DeleteCustomerRequest.newBuilder().setId(created.getId()).build());
+
+        GetCustomerRequest getRequest = GetCustomerRequest.newBuilder().setId(created.getId()).build();
+        StatusRuntimeException e = assertThrows(StatusRuntimeException.class, () -> client.getCustomer(getRequest));
+        assertEquals(io.grpc.Status.Code.NOT_FOUND, e.getStatus().getCode());
+    }
+
+    @Test
+    void deleteCustomerIsIdempotentForUnknownId() {
+        // Deleting an id that doesn't exist should not fail the RPC.
+        client.deleteCustomer(DeleteCustomerRequest.newBuilder().setId(-1).build());
     }
 }
