@@ -18,8 +18,8 @@ persistência com JDBI + PostgreSQL e migrations com Flyway.
 docker compose up -d
 ```
 
-Isso sobe um Postgres em `localhost:5432` com o banco/usuário/senha `customer_grpc`
-(veja `docker-compose.yml`). Essas credenciais são os defaults lidos pelo server
+Isso sobe um Postgres em `localhost:5432` com o banco `customersdb` e usuário/senha
+`user`/`password` (veja `docker-compose.yml`). Essas credenciais são os defaults lidos pelo server
 via variáveis de ambiente (`DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`),
 que podem ser sobrescritas se necessário.
 
@@ -45,7 +45,7 @@ java -jar customer-grpc-server/target/customer-grpc-server-1.0.0-SNAPSHOT.jar
 ```
 
 Na inicialização o server roda as migrations do Flyway automaticamente e sobe
-o gRPC server na porta `50051` (configurável via `-Dserver.port`).
+o gRPC server na porta `50052` (configurável via `-Dserver.port`).
 
 ### 4. Rodar a demo do client
 
@@ -55,6 +55,37 @@ mvn -pl customer-grpc-client exec:java -Dexec.mainClass=com.sonnesen.Main
 
 A demo cria um cliente, busca ele de volta por id e lista todos os clientes,
 imprimindo os resultados no console.
+
+### 5. Testes
+
+```sh
+mvn test
+```
+
+`customer-grpc-server` tem testes unitários (`CustomerMapperTest`) e testes de
+integração que sobem um PostgreSQL descartável via [Testcontainers](https://testcontainers.com/)
+(`JdbiCustomerRepositoryTest`, e `CustomerServiceImplTest` que chama as RPCs de
+ponta a ponta sobre um canal in-process). É necessário ter o Docker rodando.
+
+### 6. Explorando o server sem o client
+
+O server expõe [gRPC reflection](https://grpc.io/docs/guides/reflection/) e o
+serviço padrão `grpc.health.v1.Health`, então dá pra inspecionar/chamar as RPCs
+sem precisar do `.proto` nem do client Java, por exemplo com o
+[grpcurl](https://github.com/fullstorydev/grpcurl):
+
+```sh
+grpcurl -plaintext localhost:50052 list
+grpcurl -plaintext localhost:50052 grpc.health.v1.Health/Check
+```
+
+## Tratamento de erros
+
+`CustomerServiceImpl` lança exceções de domínio (`CustomerNotFoundException`,
+`DuplicateEmailException`, `IllegalArgumentException`) em vez de montar `Status`
+manualmente; o `ExceptionHandlingInterceptor` centraliza a tradução para
+`NOT_FOUND`/`ALREADY_EXISTS`/`INVALID_ARGUMENT`/`INTERNAL`, logando o stack trace
+completo só no servidor (sem vazar detalhes internos pro cliente).
 
 ## Roadmap
 

@@ -7,7 +7,6 @@ import com.sonnesen.customer.grpc.GetCustomerRequest;
 import com.sonnesen.customer.grpc.ListCustomersRequest;
 import com.sonnesen.customer.grpc.ListCustomersResponse;
 
-import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
 
 public class CustomerServiceImpl extends CustomerServiceGrpc.CustomerServiceImplBase {
@@ -21,35 +20,22 @@ public class CustomerServiceImpl extends CustomerServiceGrpc.CustomerServiceImpl
     @Override
     public void createCustomer(CreateCustomerRequest request, StreamObserver<Customer> responseObserver) {
         if (request.getName().isBlank() || request.getEmail().isBlank()) {
-            responseObserver.onError(Status.INVALID_ARGUMENT
-                .withDescription("name and email are required")
-                .asRuntimeException());
-            return;
+            throw new IllegalArgumentException("name and email are required");
         }
 
-        try {
-            com.sonnesen.Customer created = repository.insert(CustomerMapper.toDomain(request));
-            responseObserver.onNext(CustomerMapper.toProto(created));
-            responseObserver.onCompleted();
-        } catch (DuplicateEmailException e) {
-            responseObserver.onError(Status.ALREADY_EXISTS
-                .withDescription(e.getMessage())
-                .asRuntimeException());
-        }
+        // DuplicateEmailException, if thrown, propagates to ExceptionHandlingInterceptor.
+        com.sonnesen.Customer created = repository.insert(CustomerMapper.toDomain(request));
+        responseObserver.onNext(CustomerMapper.toProto(created));
+        responseObserver.onCompleted();
     }
 
     @Override
     public void getCustomer(GetCustomerRequest request, StreamObserver<Customer> responseObserver) {
-        repository.findById(request.getId())
-            .ifPresentOrElse(
-                customer -> {
-                    responseObserver.onNext(CustomerMapper.toProto(customer));
-                    responseObserver.onCompleted();
-                },
-                () -> responseObserver.onError(Status.NOT_FOUND
-                    .withDescription(new CustomerNotFoundException(request.getId()).getMessage())
-                    .asRuntimeException())
-            );
+        com.sonnesen.Customer customer = repository.findById(request.getId())
+            .orElseThrow(() -> new CustomerNotFoundException(request.getId()));
+
+        responseObserver.onNext(CustomerMapper.toProto(customer));
+        responseObserver.onCompleted();
     }
 
     @Override

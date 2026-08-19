@@ -13,7 +13,7 @@ public class Main {
 
     public static void main(String[] args) {
         String host = System.getProperty("server.host", "localhost");
-        int port = Integer.parseInt(System.getProperty("server.port", "50051"));
+        int port = Integer.parseInt(System.getProperty("server.port", "50052"));
 
         try (CustomerClient client = new CustomerClient(host, port)) {
             Address address = Address.newBuilder()

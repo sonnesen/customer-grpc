@@ -21,9 +21,9 @@ public final class Database {
         PGSimpleDataSource dataSource = new PGSimpleDataSource();
         dataSource.setServerNames(new String[] { env("DB_HOST", "localhost") });
         dataSource.setPortNumbers(new int[] { Integer.parseInt(env("DB_PORT", "5432")) });
-        dataSource.setDatabaseName(env("DB_NAME", "customer_grpc"));
-        dataSource.setUser(env("DB_USER", "customer_grpc"));
-        dataSource.setPassword(env("DB_PASSWORD", "customer_grpc"));
+        dataSource.setDatabaseName(env("DB_NAME", "customersdb"));
+        dataSource.setUser(env("DB_USER", "user"));
+        dataSource.setPassword(env("DB_PASSWORD", "password"));
 
         Flyway.configure()
             .dataSource(dataSource)
